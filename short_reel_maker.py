@@ -14,7 +14,7 @@ import subprocess
 import json
 
 # Define the paths to your input and output videos
-input_video_path = "video.mp4"
+input_video_path = "vm.mp4"
 output_video_path = "output_trailer.mp4"
 
 # Load the input video
@@ -24,7 +24,7 @@ clip = VideoFileClip(input_video_path)
 #we can add any time clips according to our intrest as document say we can choose to trim any clip in the video
 clips_to_extract = [   # 20-30 seconds
     (10, 20),  # 1:20-1:30 minutes
-    (240, 260)
+    (200, 220)
 ]
 
 # Extract the specified clips from the input video
@@ -135,36 +135,47 @@ for segment in data["segments"]:
             srt_data += f"{word_counter}\n{start_time} --> {end_time}\n{text}\n\n"
             word_counter += 1
 
-# Write srt data to file
+srt_data = ""
+
+# Write SRT data to a file
+
 with open("output.srt", "w") as f:
     f.write(srt_data)
 
 print("SRT file generated successfully!")
 
+# Check if the SRT file is not empty
+#basically i am doing this because as if video does not have any human speech it will throw so i am handiling like this to skip this command if it doesn't have any human sppech
+if os.path.getsize("output.srt") > 0:
+    # Define the ffmpeg command
+    command = [
+        "ffmpeg",
+        "-i",
+        output_video_path,
+        "-vf",
+        "subtitles=output.srt",
+        "short.avi"
+    ]
 
-
-command = [
-    "ffmpeg",
-    "-i",
-    output_video_path,
-    "-vf",
-    "subtitles=output.srt",
-    "short.avi"
-]
-
-# Run the command
-try:
-    subprocess.run(command, check=True)
-    print("Command executed successfully!")
-except subprocess.CalledProcessError as e:
-    print(f"Error executing command: {e}")
+    # Run the command
+    try:
+        subprocess.run(command, check=True)
+        print("Command executed successfully!")
+    except subprocess.CalledProcessError as e:
+        print(f"Error executing command: {e}")
+else:
+    print("SRT file is empty or not generated. Skipping ffmpeg command.")
 
 
 
 input_file = "short.avi"
 output_file = "output.mp4"
 
-command = [
+#if above command doen't run this also doesn't run so i am checking if file is present in source directory or not like that and i am using special encodings here which i need specifically when i try to add bacground music thats why i am running command in else part also
+
+if os.path.exists(input_file):
+    output_file = "output.mp4"
+    command = [
     "ffmpeg",
     "-i", input_file,
     "-vf", "scale=1020:1812",
@@ -173,10 +184,23 @@ command = [
     "-c:a", "aac",
     "-strict", "experimental",  
     output_file
-]
+    ]
 
-subprocess.run(command)
-
+    subprocess.run(command)
+else:
+    input_file="output_trailer.mp4"
+    ffmpeg_command = [
+    "ffmpeg",
+    "-i", input_file,
+    "-vf", "scale=1020:1812",
+    "-c:v", "libx264",
+    "-b:v", "1000k", 
+    "-c:a", "aac",
+    "-strict", "experimental",  
+    output_file
+    ]
+# Execute the ffmpeg command
+    subprocess.run(ffmpeg_command)
 
 # Create output directory if it doesn't exist
 os.makedirs("output", exist_ok=True)
@@ -261,7 +285,7 @@ inputs = processor(
 )
 
 # Generate audio
-audio_values = model.generate(**inputs.to("cpu"), do_sample=True, guidance_scale=3, max_new_tokens=256)
+audio_values = model.generate(**inputs.to("cpu"), do_sample=True, guidance_scale=3, max_new_tokens=512)
 
 # Get sampling rate from model config
 sampling_rate = model.config.audio_encoder.sampling_rate
@@ -302,7 +326,7 @@ audio_clip = AudioFileClip("extended_music.mp3")
 background_audio = audio_clip.set_duration(video_clip.duration)
 
 # Adjust the volume of the background audio
-background_audio = background_audio.fx(afx.audio_fadein, 1).fx(afx.volumex, 0.1)
+background_audio = background_audio.fx(afx.audio_fadein, 1).fx(afx.volumex, 0.6)
 
 # Overlay the background audio with the main audio
 final_audio = CompositeAudioClip([background_audio, video_clip.audio])
